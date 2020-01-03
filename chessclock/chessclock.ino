@@ -1,4 +1,10 @@
 /*
+Chess clock
+===========
+P. poliakoff 2020
+
+This has been tested with Arduino uno r3 and with Arduino micro
+
 This sketch uses 2 LCD displays
 The circuit:
 * LCD RS pin to digital pin 12
@@ -13,6 +19,11 @@ The circuit:
 * 10K pot
 * ends to +5V and ground
 * wiper to LCD VO pin
+* 
+* switches
+* player 0: pin 6
+* player 1: pin 7
+* pause : pin 8
 */
 
 // Directly based on the Arduino example LiquidCrystal HelloWorld
@@ -72,16 +83,27 @@ if(settings[play_time_minutes]>MAX_SETTINGS[play_time_minutes]||
 
  
  
-  // setup interrupts on timer 2
-    cli();
+  // setup interrupts on timer 2 for 8kHz
+  cli();
+  #ifdef __AVR_ATmega32U4__
+    TCCR3A = 0;
+    TCCR3B = 0;
+    TCNT3  = 0;
+    OCR3A = 249;// = (16*10^6) / (8000*8) - 1
+    TCCR3B |= (1 << WGM32);  // configure timer3 for ctc
+    TCCR3B |= (1 << CS31); //prescaler divied by 8   
+    TIMSK3 |= (1 << OCIE3A);
+
+  #else
     TCCR2A = 0;
     TCCR2B = 0;
     TCNT2  = 0;
     // configure for 8khz 
-    OCR2A = 249;// = (16*10^6) / (8000*8) - 1 (must be <256)
-    TCCR2A |= (1 << WGM21);
-    TCCR2B |= (1 << CS21);   
+    OCR2A = 249;// = (16*10^6) / (8000*8) - 1
+    TCCR2A |= (1 << WGM21);  // configure timer2 for ctc
+    TCCR2B |= (1 << CS21); //prescaler divied by 8   
     TIMSK2 |= (1 << OCIE2A);
+  #endif
     sei();
 
   
@@ -249,7 +271,11 @@ void saveSettings()
 }
 
 //interrupt routine triggered 8000 times per second
+#ifdef __AVR_ATmega32U4__
+ISR(TIMER3_COMPA_vect)
+#else
 ISR(TIMER2_COMPA_vect)
+#endif
 {
   if(!paused)
     {
